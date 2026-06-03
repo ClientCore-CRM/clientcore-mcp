@@ -1,0 +1,85 @@
+# ClientCore MCP
+
+MCP-сервер для [offer.clientcore.ru](https://offer.clientcore.ru) — создавай коммерческие предложения (КП) прямо из Claude Desktop, Cursor, Claude Code и других MCP-клиентов.
+
+Умеет:
+- **Пакетные КП** — CRM Лайт (100к) / Старт (150к) / Рост (200к)
+- **Performance KPI** — режим поверх любого пакета: лимиты ×2 + премия 15% от прироста выручки CRM
+- **Кастомные КП** — произвольный набор услуг через калькулятор
+- Разовые услуги (аудит, стратегия, мастер-шаблон, ПЛ, настройка Mindbox) и контракт 12 мес
+
+На выходе — публичная ссылка на КП-лендинг + ссылка на PDF.
+
+## 1. Получи токен
+
+Зайди на **offer.clientcore.ru → Настройки** (под своим `@clientcore.ru` аккаунтом), создай API-токен и скопируй его (показывается один раз).
+
+## 2. Подключи MCP
+
+### Claude Desktop
+
+`~/Library/Application Support/Claude/claude_desktop_config.json` (macOS):
+
+```json
+{
+  "mcpServers": {
+    "clientcore": {
+      "command": "npx",
+      "args": ["-y", "github:ClientCore-CRM/clientcore-mcp"],
+      "env": {
+        "CLIENTCORE_API_TOKEN": "cck_ваш_токен"
+      }
+    }
+  }
+}
+```
+
+### Claude Code
+
+```bash
+claude mcp add clientcore \
+  --env CLIENTCORE_API_TOKEN=cck_ваш_токен \
+  -- npx -y github:ClientCore-CRM/clientcore-mcp
+```
+
+### Cursor
+
+`~/.cursor/mcp.json` — тот же формат, что и Claude Desktop.
+
+Перезапусти клиент после изменения конфига.
+
+## 3. Пользуйся
+
+Примеры запросов агенту:
+
+- «Сделай КП для Tripster на пакет Рост с Performance KPI»
+- «Собери кастомное КП: менеджмент, email-автоматизация 20ч, 8 рассылок, аудит разово»
+- «КП на Старт с контрактом 12 месяцев и мастер-шаблоном на 14 блоков»
+
+## Инструменты
+
+| Tool | Что делает |
+|---|---|
+| `get_catalog` | Пакеты, услуги (ключи для кастома), addons, типы оплаты |
+| `create_package_kp` | КП на пакете (+ опц. `kpiMode`, `kpiBaseline`, `addOns`, `contract12Months`) |
+| `create_custom_kp` | Кастомное КП по `selections` калькулятора |
+
+## Переменные окружения
+
+| Переменная | По умолчанию | |
+|---|---|---|
+| `CLIENTCORE_API_TOKEN` | — | **обязательно** |
+| `CLIENTCORE_BASE_URL` | `https://offer.clientcore.ru` | для локальной разработки |
+
+## Локальная разработка
+
+```bash
+npm install
+npm run build
+CLIENTCORE_API_TOKEN=cck_... CLIENTCORE_BASE_URL=http://localhost:3000 npm run dev
+```
+
+## Безопасность
+
+- Токен даёт право создавать КП от твоего имени. Не коммить его и не передавай.
+- Скомпрометирован — отзови в **Настройках** и создай новый.

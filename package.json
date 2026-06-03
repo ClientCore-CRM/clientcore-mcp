@@ -1,0 +1,30 @@
+{
+  "name": "clientcore-mcp",
+  "version": "0.1.0",
+  "description": "MCP-сервер ClientCore — создание коммерческих предложений (КП) на offer.clientcore.ru из Claude / Cursor и других MCP-клиентов.",
+  "type": "module",
+  "bin": {
+    "clientcore-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "prepare": "tsc"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.19",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  },
+  "license": "MIT"
+}
