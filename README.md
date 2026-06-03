@@ -64,6 +64,7 @@ claude mcp add clientcore \
 | `create_package_kp` | КП на пакете (+ опц. `kpiMode`, `kpiBaseline`, `addOns`, `contract12Months`) |
 | `create_custom_kp` | Кастомное КП по `selections` калькулятора |
 | `set_kp_logo` | Сменить логотип существующего КП по `slug` |
+| `create_share_link` | Ссылка для клиента (с токеном — открытия логируются) |
 
 ## Переменные окружения
 

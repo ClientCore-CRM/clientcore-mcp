@@ -160,6 +160,21 @@ server.tool(
   }
 );
 
+/* ───────── create_share_link ───────── */
+server.tool(
+  "create_share_link",
+  "Создать ссылку для отправки клиенту по slug КП. Ссылка с токеном — открытия " +
+    "клиентом логируются и атрибутируются (видно в портале). Возвращает shareUrl (для клиента) и publicUrl.",
+  {
+    slug: z.string().describe("slug КП — часть ссылки после /kp/"),
+  },
+  async (args) => {
+    const r = await api("POST", "/api/v1/kp/share", args);
+    if (!r.ok) return asText({ error: true, status: r.status, details: r.data });
+    return asText(r.data);
+  }
+);
+
 const transport = new StdioServerTransport();
 await server.connect(transport);
 // eslint-disable-next-line no-console
