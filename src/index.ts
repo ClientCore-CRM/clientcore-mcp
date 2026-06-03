@@ -141,6 +141,25 @@ server.tool(
   }
 );
 
+/* ───────── set_kp_logo ───────── */
+server.tool(
+  "set_kp_logo",
+  "Сменить логотип у существующего КП по его slug (часть ссылки после /kp/). " +
+    "logoUrl — прямая ссылка на картинку (png/jpg/svg). Передай пустую строку или null, чтобы убрать логотип.",
+  {
+    slug: z.string().describe("slug КП — часть ссылки после /kp/ (например tripster-ab12cd)"),
+    logoUrl: z
+      .string()
+      .nullable()
+      .describe("URL логотипа (png/jpg/svg) или null/пусто чтобы убрать"),
+  },
+  async (args) => {
+    const r = await api("POST", "/api/v1/kp/logo", args);
+    if (!r.ok) return asText({ error: true, status: r.status, details: r.data });
+    return asText(r.data);
+  }
+);
+
 const transport = new StdioServerTransport();
 await server.connect(transport);
 // eslint-disable-next-line no-console
