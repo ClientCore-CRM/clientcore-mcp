@@ -65,6 +65,9 @@ server.tool(
     "плюс премия 15% от прироста выручки CRM (мин 80к/мес). Возвращает публичную ссылку на КП и ссылку на PDF.",
   {
     clientName: z.string().describe("Название клиента/компании"),
+    bitrixDealId: z
+      .string()
+      .describe("ОБЯЗАТЕЛЬНО: числовой id сделки Bitrix24 (КП всегда привязывается к сделке; заполнит её поля пакет/вид проекта + ссылку КП)"),
     clientSite: z.string().optional().describe("Сайт клиента (для логотипа и slug)"),
     clientLogo: z.string().optional().describe("URL логотипа (опционально)"),
     packageKey: z
@@ -117,6 +120,9 @@ server.tool(
     "чтобы получить правильные selectionKey. Возвращает публичную ссылку и PDF.",
   {
     clientName: z.string().describe("Название клиента"),
+    bitrixDealId: z
+      .string()
+      .describe("ОБЯЗАТЕЛЬНО: числовой id сделки Bitrix24 (КП всегда привязывается к сделке; заполнит её поля + ссылку КП)"),
     clientSite: z.string().optional(),
     clientLogo: z.string().optional(),
     selections: z
