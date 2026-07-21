@@ -42,7 +42,7 @@ function asText(obj: unknown) {
 
 const server = new McpServer({
   name: "clientcore-mcp",
-  version: "0.1.0",
+  version: "0.2.0",
 });
 
 /* ───────── get_catalog ───────── */
@@ -62,14 +62,19 @@ server.tool(
   "create_package_kp",
   "Создать КП на основе пакета (CRM Лайт 100к / CRM Старт 150к / CRM Рост 200к). " +
     "Для KPI-режима (Performance) передай kpiMode=true — лимиты пакета удваиваются, " +
-    "плюс премия 15% от прироста выручки CRM (мин 80к/мес). Возвращает публичную ссылку на КП и ссылку на PDF.",
+    "плюс премия 15% от прироста выручки CRM (мин 80к/мес). Возвращает публичную ссылку на КП и ссылку на PDF.\n\n" +
+    "ВАЖНО: повторный вызов по той же сделке ПЕРЕЗАПИСЫВАЕТ существующее КП, сохраняя ссылку " +
+    "(replaced=true в ответе) — так можно спокойно пересобирать состав, не плодя дубли. " +
+    "Нужны два разных КП по одной сделке (например показать клиенту два пакета на выбор) — передай forceNew=true.\n" +
+    "Логотип: если clientLogo не передан, но есть clientSite — подставится автоматически по домену. " +
+    "Если в ответе logoSource=\"none\", логотипа нет — спроси у пользователя ссылку и поставь через set_kp_logo.",
   {
     clientName: z.string().describe("Название клиента/компании"),
     bitrixDealId: z
       .string()
       .describe("ОБЯЗАТЕЛЬНО: числовой id сделки Bitrix24 (КП всегда привязывается к сделке; заполнит её поля пакет/вид проекта + ссылку КП)"),
-    clientSite: z.string().optional().describe("Сайт клиента (для логотипа и slug)"),
-    clientLogo: z.string().optional().describe("URL логотипа (опционально)"),
+    clientSite: z.string().optional().describe("Сайт клиента — из него берётся slug и автологотип по домену"),
+    clientLogo: z.string().optional().describe("URL логотипа. Не передан — подставится автоматически по clientSite"),
     packageKey: z
       .enum(["lite", "starter", "growth_plus"])
       .describe("lite=Лайт 100к, starter=Старт 150к, growth_plus=Рост 200к"),
@@ -93,6 +98,10 @@ server.tool(
         "Разовые услуги. Ключи: strategy_audit, strategy_automation_strategy, strategy_loyalty_model, strategy_mindbox_setup, design_universal_template (qty = блоки шаблона)"
       ),
     tasks: z.array(z.string()).max(8).optional().describe("Задачи клиента (буллеты)"),
+    forceNew: z
+      .boolean()
+      .optional()
+      .describe("Создать НОВОЕ КП вместо перезаписи существующего по этой сделке (два варианта клиенту на выбор)"),
     vertical: z.string().optional().describe("Сегмент: fashion/ecom/horeca/retail/beauty/b2b/saas/general"),
     kpiBaseline: z
       .object({
@@ -117,7 +126,11 @@ server.tool(
 server.tool(
   "create_custom_kp",
   "Создать кастомное КП по произвольному набору услуг (selections). Сначала вызови get_catalog, " +
-    "чтобы получить правильные selectionKey. Возвращает публичную ссылку и PDF.",
+    "чтобы получить правильные selectionKey. Возвращает публичную ссылку и PDF.\n\n" +
+    "ВАЖНО: повторный вызов по той же сделке ПЕРЕЗАПИСЫВАЕТ существующее КП, сохраняя ссылку " +
+    "(replaced=true в ответе). Нужно второе КП по той же сделке — forceNew=true.\n" +
+    "Логотип: не передан clientLogo, но есть clientSite — подставится по домену. " +
+    "logoSource=\"none\" в ответе — логотипа нет, спроси ссылку у пользователя и поставь через set_kp_logo.",
   {
     clientName: z.string().describe("Название клиента"),
     bitrixDealId: z
@@ -139,6 +152,10 @@ server.tool(
     projectType: z.enum(["regular", "oneoff"]).optional().describe("regular=ежемесячно, oneoff=разовый проект"),
     paymentType: z.enum(["prepay", "postpay0", "postpay7", "postpay14", "postpay30"]).optional(),
     contract12Months: z.boolean().optional(),
+    forceNew: z
+      .boolean()
+      .optional()
+      .describe("Создать НОВОЕ КП вместо перезаписи существующего по этой сделке"),
   },
   async (args) => {
     const r = await api("POST", "/api/v1/kp/custom", args);

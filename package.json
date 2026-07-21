@@ -1,6 +1,6 @@
 {
   "name": "clientcore-mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "MCP-сервер ClientCore — создание коммерческих предложений (КП) на offer.clientcore.ru из Claude / Cursor и других MCP-клиентов.",
   "type": "module",
   "bin": {
