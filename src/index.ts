@@ -66,6 +66,7 @@ server.tool(
     "ВАЖНО: повторный вызов по той же сделке ПЕРЕЗАПИСЫВАЕТ существующее КП, сохраняя ссылку " +
     "(replaced=true в ответе) — так можно спокойно пересобирать состав, не плодя дубли. " +
     "Нужны два разных КП по одной сделке (например показать клиенту два пакета на выбор) — передай forceNew=true.\n" +
+    "Скидка: передай discount + discountReason (причина обязательна) — в КП она ляжет слоем поверх прайс-цены, а в Loop уйдёт алерт. Срок пилота — termMonths.\n" +
     "Логотип: если clientLogo не передан, но есть clientSite — подставится автоматически по домену. " +
     "Если в ответе logoSource=\"none\", логотипа нет — спроси у пользователя ссылку и поставь через set_kp_logo.",
   {
@@ -103,6 +104,30 @@ server.tool(
       .optional()
       .describe("Создать НОВОЕ КП вместо перезаписи существующего по этой сделке (два варианта клиенту на выбор)"),
     vertical: z.string().optional().describe("Сегмент: fashion/ecom/horeca/retail/beauty/b2b/saas/general"),
+    termMonths: z
+      .number()
+      .int()
+      .min(1)
+      .max(24)
+      .optional()
+      .describe("Срок проекта в месяцах (1-24). Для пилотов и разовых проектов. Не задан = бессрочно"),
+    discount: z
+      .object({
+        type: z.enum(["percent", "fixed"]).describe("percent = % от стоимости, fixed = сумма в ₽"),
+        value: z.number().min(0).describe("Для percent — проценты, для fixed — рубли"),
+        untilDate: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/)
+          .nullable()
+          .optional()
+          .describe("Дата окончания скидки YYYY-MM-DD. Пусто = до конца года от старта"),
+      })
+      .optional()
+      .describe("Скидка на КП. Вместе с ней ОБЯЗАТЕЛЬНА discountReason, иначе 422"),
+    discountReason: z
+      .string()
+      .optional()
+      .describe("Причина скидки — обязательна при discount. Уходит алертом в Loop вместе со ссылкой на КП"),
     kpiBaseline: z
       .object({
         withKpi: z.boolean(),
@@ -129,6 +154,7 @@ server.tool(
     "чтобы получить правильные selectionKey. Возвращает публичную ссылку и PDF.\n\n" +
     "ВАЖНО: повторный вызов по той же сделке ПЕРЕЗАПИСЫВАЕТ существующее КП, сохраняя ссылку " +
     "(replaced=true в ответе). Нужно второе КП по той же сделке — forceNew=true.\n" +
+    "Скидка: передай discount + discountReason (причина обязательна) — в КП она ляжет слоем поверх прайс-цены, а в Loop уйдёт алерт. Срок пилота — termMonths.\n" +
     "Логотип: не передан clientLogo, но есть clientSite — подставится по домену. " +
     "logoSource=\"none\" в ответе — логотипа нет, спроси ссылку у пользователя и поставь через set_kp_logo.",
   {
@@ -156,6 +182,30 @@ server.tool(
       .boolean()
       .optional()
       .describe("Создать НОВОЕ КП вместо перезаписи существующего по этой сделке"),
+    termMonths: z
+      .number()
+      .int()
+      .min(1)
+      .max(24)
+      .optional()
+      .describe("Срок проекта в месяцах (1-24). Для пилотов и разовых проектов. Не задан = бессрочно"),
+    discount: z
+      .object({
+        type: z.enum(["percent", "fixed"]).describe("percent = % от стоимости, fixed = сумма в ₽"),
+        value: z.number().min(0).describe("Для percent — проценты, для fixed — рубли"),
+        untilDate: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/)
+          .nullable()
+          .optional()
+          .describe("Дата окончания скидки YYYY-MM-DD. Пусто = до конца года от старта"),
+      })
+      .optional()
+      .describe("Скидка на КП. Вместе с ней ОБЯЗАТЕЛЬНА discountReason, иначе 422"),
+    discountReason: z
+      .string()
+      .optional()
+      .describe("Причина скидки — обязательна при discount. Уходит алертом в Loop вместе со ссылкой на КП"),
   },
   async (args) => {
     const r = await api("POST", "/api/v1/kp/custom", args);
