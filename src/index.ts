@@ -48,7 +48,7 @@ const server = new McpServer({
 /* ───────── get_catalog ───────── */
 server.tool(
   "get_catalog",
-  "Получить каталог ClientCore: доступные пакеты (lite/starter/growth_plus), их состав и цены, список услуг с ключами для кастомных КП, разовые услуги (addons), типы оплаты. Вызови это ПЕРЕД созданием кастомного КП, чтобы знать правильные selectionKey.",
+  "Получить каталог ClientCore: доступные пакеты (lite/starter/growth_plus), их состав и цены, список услуг с ключами и ценами для кастомных КП, разовые услуги (addons), типы оплаты и правила состава (notes). Вызови это ПЕРЕД созданием кастомного КП, чтобы знать правильные selectionKey и не называть клиенту цену по памяти: прайс меняется, а ответ каталога — единственный его источник. Позиции с tierPricing (аудит, стратегия, модель ПЛ) стоят по-разному в зависимости от revenueTier.",
   {},
   async () => {
     const r = await api("GET", "/api/v1/catalog");
@@ -91,12 +91,16 @@ server.tool(
     revenueTier: z
       .enum(["up_to_1m", "above_1m"])
       .optional()
-      .describe("Размер базы клиента (влияет на цену аудита/стратегии)"),
+      .describe(
+        "Размер базы клиента: up_to_1m = до 1 млн, above_1m = от 1 млн. Влияет на цену аудита (150к/250к), стратегии автоматизации (500к/750к) и модели ПЛ (600к/900к)"
+      ),
     addOns: z
       .record(z.object({ qty: z.number().int().positive().optional() }))
       .optional()
       .describe(
-        "Разовые услуги. Ключи: strategy_audit, strategy_automation_strategy, strategy_loyalty_model, strategy_mindbox_setup, design_universal_template (qty = блоки шаблона)"
+        "Разовые услуги. Ключи: strategy_audit, strategy_automation_strategy, strategy_loyalty_model, strategy_mindbox_setup, design_universal_template (qty = блоки шаблона). " +
+          "strategy_audit и strategy_automation_strategy взаимоисключающие — аудит целиком входит в стратегию; пришлёшь обе, останется стратегия. " +
+          "Цена аудита и стратегии зависит от revenueTier, плоской цены у них больше нет"
       ),
     tasks: z.array(z.string()).max(8).optional().describe("Задачи клиента (буллеты)"),
     forceNew: z
@@ -156,7 +160,10 @@ server.tool(
 server.tool(
   "create_custom_kp",
   "Создать кастомное КП по произвольному набору услуг (selections). Сначала вызови get_catalog, " +
-    "чтобы получить правильные selectionKey. Возвращает публичную ссылку и PDF.\n\n" +
+    "чтобы получить правильные selectionKey и актуальные цены. Возвращает публичную ссылку и PDF.\n\n" +
+    "Состав КП сервер нормализует: аудит и стратегия автоматизации взаимоисключающие, а «Сопровождение проекта» " +
+    "включается само под любую услугу кроме них двоих (и снимается, если в КП только аудит и/или стратегия). " +
+    "Итоговый состав смотри по ссылке КП, а не по тому, что отправил.\n\n" +
     "ВАЖНО: повторный вызов по той же сделке ПЕРЕЗАПИСЫВАЕТ существующее КП, сохраняя ссылку " +
     "(replaced=true в ответе). Нужно второе КП по той же сделке — forceNew=true.\n" +
     "Скидка: передай discount + discountReason (причина обязательна) — в КП она ляжет слоем поверх прайс-цены, а в Loop уйдёт алерт. Срок пилота — termMonths.\n" +
@@ -177,8 +184,18 @@ server.tool(
           qty: z.number().optional(),
         })
       )
-      .describe("Карта услуг: { selectionKey: { status, hours?, qty? } }. Ключи из get_catalog."),
-    revenueTier: z.enum(["up_to_1m", "above_1m"]).optional(),
+      .describe(
+        "Карта услуг: { selectionKey: { status, hours?, qty? } }. Ключи из get_catalog.\n" +
+          "Два правила состава применяются на сервере, спорить с ними бесполезно:\n" +
+          "1) strategy_audit и strategy_automation_strategy не совмещаются — аудит входит в стратегию целиком, пришлёшь обе, аудит снимется;\n" +
+          "2) management_base («Сопровождение проекта») проставляется сам, как только в КП есть хоть одна услуга кроме аудита и стратегии, и наоборот — снимается вместе с management_monthly_analysis, если в КП только аудит и/или стратегия. Разовую консультацию не сопровождают, и менеджмент за 30-60к в такое КП попасть не должен."
+      ),
+    revenueTier: z
+      .enum(["up_to_1m", "above_1m"])
+      .optional()
+      .describe(
+        "Размер базы клиента: up_to_1m = до 1 млн (дефолт), above_1m = от 1 млн. Влияет на цену аудита (150к/250к), стратегии автоматизации (500к/750к) и модели ПЛ (600к/900к)"
+      ),
     mode: z.enum(["hours", "mechanics"]).optional().describe("Режим расчёта автоматизаций"),
     projectType: z.enum(["regular", "oneoff"]).optional().describe("regular=ежемесячно, oneoff=разовый проект"),
     paymentType: z.enum(["prepay", "postpay0", "postpay7", "postpay14", "postpay30"]).optional(),
