@@ -85,7 +85,7 @@ server.tool(
       .optional()
       .describe("Контракт 12 мес: ТЗ Mindbox бесплатно, мастер-шаблон до 90к включено"),
     paymentType: z
-      .enum(["prepay", "postpay0", "postpay7", "postpay14", "postpay30"])
+      .enum(["prepay", "postpay0", "postpay7", "postpay14", "postpay30", "postpay45"])
       .optional()
       .describe("Тип оплаты (наценка за постоплату)"),
     revenueTier: z
@@ -198,7 +198,7 @@ server.tool(
       ),
     mode: z.enum(["hours", "mechanics"]).optional().describe("Режим расчёта автоматизаций"),
     projectType: z.enum(["regular", "oneoff"]).optional().describe("regular=ежемесячно, oneoff=разовый проект"),
-    paymentType: z.enum(["prepay", "postpay0", "postpay7", "postpay14", "postpay30"]).optional(),
+    paymentType: z.enum(["prepay", "postpay0", "postpay7", "postpay14", "postpay30", "postpay45"]).optional(),
     contract12Months: z.boolean().optional(),
     forceNew: z
       .boolean()
