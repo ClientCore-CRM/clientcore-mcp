@@ -36,6 +36,26 @@ async function api(
   return { ok: res.ok, status: res.status, data };
 }
 
+/**
+ * Потолок месячной CRM-выручки в млн ₽ — выше значит «не те единицы».
+ * Та же граница, что на сервере (calc-clientcore src/lib/kpi.ts,
+ * MAX_MONTHLY_REVENUE_M): сервер — главный замок, здесь ранняя проверка, чтобы
+ * агент увидел ошибку в ответе тула и сразу переслал правильные числа.
+ * Боевой случай 28.09.2026, Пироги №1: выручку передали в рублях, и клиенту
+ * ушло КП с «Прирост за контракт 1873813.9М».
+ */
+const MAX_MONTHLY_REVENUE_M = 1000;
+
+function kpiUnitsError(k: { prevYearMonthly: number[]; recent3Monthly: number[] }): string | null {
+  const bad = [...k.prevYearMonthly, ...k.recent3Monthly].find((v) => v > MAX_MONTHLY_REVENUE_M);
+  if (bad === undefined) return null;
+  const inM = bad >= 100_000 ? bad / 1_000_000 : bad / 1000;
+  return (
+    `Выручка KPI указывается в млн ₽ в месяц, а получено ${bad}. ` +
+    `Похоже на ${bad >= 100_000 ? "рубли" : "тысячи рублей"}: это ${+inM.toFixed(2)} млн ₽. Пересчитай все 15 значений и вызови снова.`
+  );
+}
+
 function asText(obj: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(obj, null, 2) }] };
 }
@@ -62,7 +82,8 @@ server.tool(
   "create_package_kp",
   "Создать КП на основе пакета (CRM Лайт 100к / CRM Старт 150к / CRM Рост 200к). " +
     "Для KPI-режима (Performance) передай kpiMode=true — лимиты пакета удваиваются, " +
-    "плюс премия 15% от прироста выручки CRM (мин 80к/мес). Возвращает публичную ссылку на КП и ссылку на PDF.\n\n" +
+    "плюс премия 15% от прироста выручки CRM (мин 80к/мес; kpiNoMinBonus=true снимает минималку). Возвращает публичную ссылку на КП и ссылку на PDF.\n\n" +
+    "Выручка в kpiBaseline — в МИЛЛИОНАХ ₽ в месяц (2 739 401 ₽ → 2.74), не в рублях.\n" +
     "ВАЖНО: повторный вызов по той же сделке ПЕРЕЗАПИСЫВАЕТ существующее КП, сохраняя ссылку " +
     "(replaced=true в ответе) — так можно спокойно пересобирать состав, не плодя дубли. " +
     "Нужны два разных КП по одной сделке (например показать клиенту два пакета на выбор) — передай forceNew=true.\n" +
@@ -80,6 +101,13 @@ server.tool(
       .enum(["lite", "starter", "growth_plus"])
       .describe("lite=Лайт 100к, starter=Старт 150к, growth_plus=Рост 200к"),
     kpiMode: z.boolean().optional().describe("Performance KPI: лимиты ×2 + премия за прирост"),
+    kpiNoMinBonus: z
+      .boolean()
+      .optional()
+      .describe(
+        "Только при kpiMode=true: премия — чистые 15% от прироста без минималки 80к/мес. Ставь, только если с клиентом так договорились — " +
+          "в sales-канал уйдёт алерт. Не передан — у существующего КП не меняется"
+      ),
     contract12Months: z
       .boolean()
       .optional()
@@ -140,11 +168,21 @@ server.tool(
     kpiBaseline: z
       .object({
         withKpi: z.boolean(),
-        prevYearMonthly: z.array(z.number()).length(12).describe("Выручка CRM прошлого года, 12 мес, млн ₽"),
-        recent3Monthly: z.array(z.number()).length(3).describe("3 последних месяца, млн ₽"),
+        prevYearMonthly: z
+          .array(z.number().nonnegative())
+          .length(12)
+          .describe("Выручка CRM прошлого года, 12 мес январь→декабрь, в МИЛЛИОНАХ ₽ (2 739 401 ₽ → 2.74)"),
+        recent3Monthly: z
+          .array(z.number().nonnegative())
+          .length(3)
+          .describe("3 последних закрытых месяца текущего года, в МИЛЛИОНАХ ₽"),
         recent3MonthIndices: z.array(z.number()).length(3).describe("Индексы месяцев 0-11"),
         baseRate: z.number().describe("Базовая ставка, тыс ₽/мес"),
         contractMonths: z.number().describe("Срок контракта, мес"),
+      })
+      .superRefine((k, ctx) => {
+        const err = kpiUnitsError(k);
+        if (err) ctx.addIssue({ code: z.ZodIssueCode.custom, message: err, path: ["prevYearMonthly"] });
       })
       .optional()
       .describe("Расчёт KPI с данными клиента (только при kpiMode=true)"),
