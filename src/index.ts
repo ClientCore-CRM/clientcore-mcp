@@ -46,13 +46,13 @@ async function api(
  */
 const MAX_MONTHLY_REVENUE_M = 1000;
 
-function kpiUnitsError(k: { prevYearMonthly: number[]; recent3Monthly: number[] }): string | null {
-  const bad = [...k.prevYearMonthly, ...k.recent3Monthly].find((v) => v > MAX_MONTHLY_REVENUE_M);
+function kpiUnitsError(k: { history: { value: number }[] }): string | null {
+  const bad = k.history.map((h) => h.value).find((v) => v > MAX_MONTHLY_REVENUE_M);
   if (bad === undefined) return null;
   const inM = bad >= 100_000 ? bad / 1_000_000 : bad / 1000;
   return (
     `Выручка KPI указывается в млн ₽ в месяц, а получено ${bad}. ` +
-    `Похоже на ${bad >= 100_000 ? "рубли" : "тысячи рублей"}: это ${+inM.toFixed(2)} млн ₽. Пересчитай все 15 значений и вызови снова.`
+    `Похоже на ${bad >= 100_000 ? "рубли" : "тысячи рублей"}: это ${+inM.toFixed(2)} млн ₽. Пересчитай всю историю и вызови снова.`
   );
 }
 
@@ -82,8 +82,8 @@ server.tool(
   "create_package_kp",
   "Создать КП на основе пакета (CRM Лайт 100к / CRM Старт 150к / CRM Рост 200к). " +
     "Для KPI-режима (Performance) передай kpiMode=true — лимиты пакета удваиваются, " +
-    "плюс премия 15% от прироста выручки CRM (мин 80к/мес; kpiNoMinBonus=true снимает минималку). Возвращает публичную ссылку на КП и ссылку на PDF.\n\n" +
-    "Выручка в kpiBaseline — в МИЛЛИОНАХ ₽ в месяц (2 739 401 ₽ → 2.74), не в рублях.\n" +
+    "плюс премия 15% от прироста выручки CRM над бейзлайном (с минималкой — не меньше 80к/мес при приросте от 5%; kpiNoMinBonus=true — чистые 15% с первого рубля). Возвращает публичную ссылку на КП и ссылку на PDF.\n\n" +
+    "kpiBaseline — история CRM-канала по месяцам из отчёта Mindbox (лучше 24 месяца, последний — последний ЗАКРЫТЫЙ), выручка в МИЛЛИОНАХ ₽ (2 739 401 ₽ → 2.74). Бейзлайн портал считает сам (метод 2: уровень × сезонность × затухающий темп, обвалы находит сам).\n" +
     "ВАЖНО: повторный вызов по той же сделке ПЕРЕЗАПИСЫВАЕТ существующее КП, сохраняя ссылку " +
     "(replaced=true в ответе) — так можно спокойно пересобирать состав, не плодя дубли. " +
     "Нужны два разных КП по одной сделке (например показать клиенту два пакета на выбор) — передай forceNew=true.\n" +
@@ -204,24 +204,33 @@ server.tool(
       .string()
       .optional()
       .describe("Причина скидки — обязательна при discount. Уходит алертом в Loop вместе со ссылкой на КП"),
+    // Метод 2 бейзлайна (портал, sales-portal#467, 07.10.2026). Старый формат
+    // {prevYearMonthly, recent3Monthly} портал ещё принимает, но здесь его
+    // нет намеренно: он завышал бейзлайн вдвое при обвале у клиента (Пироги
+    // №1), и агент не должен им пользоваться для новых КП.
     kpiBaseline: z
       .object({
         withKpi: z.boolean(),
-        prevYearMonthly: z
-          .array(z.number().nonnegative())
-          .length(12)
-          .describe("Выручка CRM прошлого года, 12 мес январь→декабрь, в МИЛЛИОНАХ ₽ (2 739 401 ₽ → 2.74)"),
-        recent3Monthly: z
-          .array(z.number().nonnegative())
-          .length(3)
-          .describe("3 последних закрытых месяца текущего года, в МИЛЛИОНАХ ₽"),
-        recent3MonthIndices: z.array(z.number()).length(3).describe("Индексы месяцев 0-11"),
+        method: z.literal(2).describe("Всегда 2"),
+        history: z
+          .array(
+            z.object({
+              ym: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).describe("Месяц ГГГГ-ММ"),
+              value: z.number().nonnegative().describe("Выручка CRM-канала за месяц, в МИЛЛИОНАХ ₽"),
+            })
+          )
+          .min(12)
+          .max(36)
+          .describe(
+            "Выручка CRM-канала по месяцам подряд, без пропусков, от старых к новым; 12–36 месяцев, лучше 24 " +
+              "(без двух лет сезонность не считается). Последний — последний ЗАКРЫТЫЙ месяц, текущий не передавать"
+          ),
         baseRate: z.number().describe("Базовая ставка, тыс ₽/мес"),
         contractMonths: z.number().describe("Срок контракта, мес"),
       })
       .superRefine((k, ctx) => {
         const err = kpiUnitsError(k);
-        if (err) ctx.addIssue({ code: z.ZodIssueCode.custom, message: err, path: ["prevYearMonthly"] });
+        if (err) ctx.addIssue({ code: z.ZodIssueCode.custom, message: err, path: ["history"] });
       })
       .optional()
       .describe("Расчёт KPI с данными клиента (только при kpiMode=true)"),
