@@ -80,7 +80,7 @@ server.tool(
 /* ───────── create_package_kp ───────── */
 server.tool(
   "create_package_kp",
-  "Создать КП на основе пакета (CRM Лайт 100к / CRM Старт 150к / CRM Рост 200к). " +
+  "Создать КП на основе пакета (CRM Лайт 118к / CRM Старт 149к / CRM Рост 201к). " +
     "Для KPI-режима (Performance) передай kpiMode=true — лимиты пакета удваиваются, " +
     "плюс премия 15% от прироста выручки CRM над бейзлайном (с минималкой — не меньше 80к/мес при приросте от 5%; kpiNoMinBonus=true — чистые 15% с первого рубля). Возвращает публичную ссылку на КП и ссылку на PDF.\n\n" +
     "kpiBaseline — история CRM-канала по месяцам из отчёта Mindbox (лучше 24 месяца, последний — последний ЗАКРЫТЫЙ), выручка в МИЛЛИОНАХ ₽ (2 739 401 ₽ → 2.74). Бейзлайн портал считает сам (метод 2: уровень × сезонность × затухающий темп, обвалы находит сам).\n" +
@@ -99,7 +99,7 @@ server.tool(
     clientLogo: z.string().optional().describe("URL логотипа. Не передан — подставится автоматически по clientSite"),
     packageKey: z
       .enum(["lite", "starter", "growth_plus"])
-      .describe("lite=Лайт 100к, starter=Старт 150к, growth_plus=Рост 200к"),
+      .describe("lite=Лайт 118к, starter=Старт 149к, growth_plus=Рост 201к"),
     kpiMode: z.boolean().optional().describe("Performance KPI: лимиты ×2 + премия за прирост"),
     kpiNoMinBonus: z
       .boolean()
