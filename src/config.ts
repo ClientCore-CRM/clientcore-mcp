@@ -10,11 +10,16 @@ export function readToken(env: Env): string | null {
   return t || null;
 }
 
-/** `cck_` -> портал ClientCore, `rrk_` -> портал Retail Rocket; CALCULATOR_BASE_URL (а если её нет - прежняя CLIENTCORE_BASE_URL) перекрывает выбор. */
+/** `cck_` -> портал ClientCore, `rrk_` -> портал Retail Rocket; CALCULATOR_BASE_URL перекрывает выбор для любого ключа; прежняя CLIENTCORE_BASE_URL - только для cck_ и ключей без известного префикса. */
 export function baseUrlFor(token: string, env: Env): string {
-  const override = env.CALCULATOR_BASE_URL?.trim() || env.CLIENTCORE_BASE_URL?.trim();
+  const override = env.CALCULATOR_BASE_URL?.trim();
   if (override) return override.replace(/\/+$/, "");
-  return token.startsWith("rrk_") ? RR_URL : CC_URL;
+  const isRr = token.startsWith("rrk_");
+  // Прежняя CLIENTCORE_BASE_URL - только для ключей ClientCore: старый конфиг с
+  // адресом offer.clientcore.ru и новым rrk_ ключом иначе отправил бы ключ РР на хост ClientCore.
+  const legacy = env.CLIENTCORE_BASE_URL?.trim();
+  if (legacy && !isRr) return legacy.replace(/\/+$/, "");
+  return isRr ? RR_URL : CC_URL;
 }
 
 export type Toolset = "cc" | "rr" | "status";

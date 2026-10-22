@@ -28,9 +28,16 @@ describe("baseUrlFor", () => {
 });
 
 describe("baseUrlFor, прежняя переменная", () => {
-  it("CLIENTCORE_BASE_URL читается, если новой нет", () => {
+  it("CLIENTCORE_BASE_URL читается для cck_ и неизвестного префикса, если новой нет", () => {
     expect(baseUrlFor("cck_abc", { CLIENTCORE_BASE_URL: "http://localhost:3000" })).toBe("http://localhost:3000");
+    expect(baseUrlFor("legacy_abc", { CLIENTCORE_BASE_URL: "http://localhost:3000/" })).toBe("http://localhost:3000");
     expect(baseUrlFor("cck_abc", { CALCULATOR_BASE_URL: "http://a", CLIENTCORE_BASE_URL: "http://b" })).toBe("http://a");
+  });
+  it("CLIENTCORE_BASE_URL никогда не перекрывает адрес ключа rrk_", () => {
+    expect(baseUrlFor("rrk_abc", { CLIENTCORE_BASE_URL: "https://offer.clientcore.ru" })).toBe("https://rrsales.clientcore.ru");
+  });
+  it("CALCULATOR_BASE_URL перекрывает и для rrk_, даже при заданной CLIENTCORE_BASE_URL", () => {
+    expect(baseUrlFor("rrk_abc", { CALCULATOR_BASE_URL: "http://stand", CLIENTCORE_BASE_URL: "https://offer.clientcore.ru" })).toBe("http://stand");
   });
 });
 

@@ -94,7 +94,7 @@ claude mcp add calculator-rr \
 
 - Репозиторий переименован из `ClientCore-CRM/clientcore-mcp`; GitHub редиректит старое имя, поэтому `npx -y github:ClientCore-CRM/clientcore-mcp` у уже подключённых продолжает работать.
 - Пакет отдаёт два bin: `calculator-mcp` и `clientcore-mcp`.
-- `CLIENTCORE_API_TOKEN` читается, если `CALCULATOR_API_TOKEN` не задана. Прежняя `CLIENTCORE_BASE_URL` тоже читается, если `CALCULATOR_BASE_URL` не задана.
+- `CLIENTCORE_API_TOKEN` читается, если `CALCULATOR_API_TOKEN` не задана. Прежняя `CLIENTCORE_BASE_URL` читается, если `CALCULATOR_BASE_URL` не задана, но только для ключей `cck_` и ключей без известного префикса: ключ `rrk_` она на хост ClientCore не отправит.
 - Имена и параметры инструментов ClientCore не изменились.
 
 ## Локальная разработка

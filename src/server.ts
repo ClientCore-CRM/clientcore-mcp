@@ -1,5 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { asText, makeApi } from "./api.js";
+
+/** Таймаут стартового опроса каталога: зависший портал не должен держать initialize дольше таймаута клиента (~30 с). */
+export const PROBE_TIMEOUT_MS = 10_000;
 import { baseUrlFor, toolsetFor, type Env } from "./config.js";
 import { registerCcTools } from "./tools-cc.js";
 import { registerCommonTools } from "./tools-common.js";
@@ -11,9 +14,9 @@ export const SERVER_VERSION = "0.4.0";
 type CatalogProbe = { engine: string | null; error: string | null };
 
 /** Спрашивает каталог и по полю engine понимает установку. Любой сбой превращается в понятный текст. */
-async function probeCatalog(baseUrl: string, token: string): Promise<CatalogProbe> {
+async function probeCatalog(baseUrl: string, token: string, timeoutMs: number): Promise<CatalogProbe> {
   try {
-    const r = await makeApi(baseUrl, token)("GET", "/api/v1/catalog");
+    const r = await makeApi(baseUrl, token, timeoutMs)("GET", "/api/v1/catalog");
     const data = (r.data ?? {}) as { engine?: unknown; error?: unknown };
     if (!r.ok) {
       const msg = typeof data.error === "string" && data.error ? data.error : `HTTP ${r.status}`;
@@ -33,9 +36,13 @@ async function probeCatalog(baseUrl: string, token: string): Promise<CatalogProb
  * недоступен - сервер поднимается с одним calculator_status, который отвечает
  * текстом ошибки портала, а не пустым списком.
  */
-export async function buildServer(token: string, env: Env): Promise<McpServer> {
+export async function buildServer(
+  token: string,
+  env: Env,
+  probeTimeoutMs: number = PROBE_TIMEOUT_MS
+): Promise<McpServer> {
   const baseUrl = baseUrlFor(token, env);
-  const probe = await probeCatalog(baseUrl, token);
+  const probe = await probeCatalog(baseUrl, token, probeTimeoutMs);
   const toolset = toolsetFor(probe.engine);
   const label = toolset === "rr" ? "Retail Rocket" : toolset === "cc" ? "ClientCore" : null;
 
@@ -57,7 +64,7 @@ export async function buildServer(token: string, env: Env): Promise<McpServer> {
       "Состояние подключения к порталу КП: почему нет инструментов калькулятора (ключ отозван, нет связи, неизвестная установка).",
       {},
       async () => {
-        const now = await probeCatalog(baseUrl, token);
+        const now = await probeCatalog(baseUrl, token, probeTimeoutMs);
         if (now.engine && toolsetFor(now.engine) !== "status") {
           return asText({ ok: true, message: "Портал снова отвечает. Перезапусти MCP-сервер, чтобы появились инструменты." });
         }

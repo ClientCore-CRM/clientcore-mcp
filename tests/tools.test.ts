@@ -7,8 +7,8 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 }
 
-async function connect(token: string, env: Record<string, string | undefined> = {}) {
-  const server = await buildServer(token, env);
+async function connect(token: string, env: Record<string, string | undefined> = {}, probeTimeoutMs?: number) {
+  const server = await buildServer(token, env, probeTimeoutMs);
   const [a, b] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: "test", version: "0" });
   await Promise.all([server.connect(a), client.connect(b)]);
@@ -50,6 +50,17 @@ describe("набор инструментов по установке", () => {
   it("портал недоступен - calculator_status говорит «нет связи»", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("fetch failed"); }));
     const c = await connect("rrk_abc");
+    expect(await names(c)).toEqual(["calculator_status"]);
+    const r = await c.callTool({ name: "calculator_status", arguments: {} });
+    expect(textOf(r)).toContain("нет связи с https://rrsales.clientcore.ru");
+  });
+
+  it("портал завис - сервер всё равно поднимается с calculator_status", async () => {
+    // fetch, который никогда не отвечает сам, но уважает signal
+    vi.stubGlobal("fetch", vi.fn((_url: string, init: RequestInit) =>
+      new Promise((_res, rej) => init.signal?.addEventListener("abort", () => rej(init.signal!.reason)))
+    ));
+    const c = await connect("rrk_abc", {}, 50);
     expect(await names(c)).toEqual(["calculator_status"]);
     const r = await c.callTool({ name: "calculator_status", arguments: {} });
     expect(textOf(r)).toContain("нет связи с https://rrsales.clientcore.ru");
