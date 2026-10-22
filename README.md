@@ -2,6 +2,8 @@
 
 MCP-сервер калькулятора коммерческих предложений (КП) для Claude Desktop, Cursor, Claude Code и других MCP-клиентов. Раньше назывался `clientcore-mcp`.
 
+Код один, репозиториев два: ClientCore ставит из `ClientCore-CRM/clientcore-mcp`, Retail Rocket — из `Retail-Rocket-Sales/calculator-mcp` (приватный, нужен доступ к организации на GitHub). Правки идут в `ClientCore-CRM/clientcore-mcp` и после мержа переносятся в репо Retail Rocket.
+
 **Установка определяется ключом.** Ключ из портала ClientCore подключает калькулятор ClientCore, ключ из портала Retail Rocket — калькулятор Retail Rocket. Подключений два, по одному на установку: КП двух компаний не смешиваются. При старте сервер спрашивает `GET /api/v1/catalog`, по полю `engine` выбирает набор инструментов и пишет в `instructions`, какой калькулятор подключён («Калькулятор КП ClientCore» / «Калькулятор КП Retail Rocket»).
 
 ## 1. Получи ключ
@@ -24,7 +26,7 @@ ClientCore:
 ```bash
 claude mcp add calculator-cc \
   --env CALCULATOR_API_TOKEN=cck_ваш_ключ \
-  -- npx -y github:ClientCore-CRM/calculator-mcp
+  -- npx -y github:ClientCore-CRM/clientcore-mcp
 ```
 
 Retail Rocket:
@@ -32,7 +34,7 @@ Retail Rocket:
 ```bash
 claude mcp add calculator-rr \
   --env CALCULATOR_API_TOKEN=rrk_ваш_ключ \
-  -- npx -y github:ClientCore-CRM/calculator-mcp
+  -- npx -y github:Retail-Rocket-Sales/calculator-mcp
 ```
 
 ### Claude Desktop / Cursor
@@ -44,7 +46,7 @@ claude mcp add calculator-rr \
   "mcpServers": {
     "calculator-rr": {
       "command": "npx",
-      "args": ["-y", "github:ClientCore-CRM/calculator-mcp"],
+      "args": ["-y", "github:Retail-Rocket-Sales/calculator-mcp"],
       "env": { "CALCULATOR_API_TOKEN": "rrk_ваш_ключ" }
     }
   }
@@ -92,7 +94,7 @@ claude mcp add calculator-rr \
 
 ## Совместимость
 
-- Репозиторий переименован из `ClientCore-CRM/clientcore-mcp`; GitHub редиректит старое имя, поэтому `npx -y github:ClientCore-CRM/clientcore-mcp` у уже подключённых продолжает работать.
+- Репозиторий ClientCore не переименован: `npx -y github:ClientCore-CRM/clientcore-mcp` у уже подключённых продолжает работать и после обновления даёт `calculator-mcp`.
 - Пакет отдаёт два bin: `calculator-mcp` и `clientcore-mcp`.
 - `CLIENTCORE_API_TOKEN` читается, если `CALCULATOR_API_TOKEN` не задана. Прежняя `CLIENTCORE_BASE_URL` читается, если `CALCULATOR_BASE_URL` не задана, но только для ключей `cck_` и ключей без известного префикса: ключ `rrk_` она на хост ClientCore не отправит.
 - Имена и параметры инструментов ClientCore не изменились.
