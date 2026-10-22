@@ -1,8 +1,8 @@
 export type Env = Record<string, string | undefined>;
 
 /** Адрес портала по префиксу ключа; ключ без известного префикса - ClientCore, как у clientcore-mcp. */
-const CC_URL = "https://offer.clientcore.ru";
-const RR_URL = "https://rrsales.clientcore.ru";
+export const CC_URL = "https://offer.clientcore.ru";
+export const RR_URL = "https://rrsales.clientcore.ru";
 
 /** Токен: CALCULATOR_API_TOKEN, а если его нет - прежний CLIENTCORE_API_TOKEN. */
 export function readToken(env: Env): string | null {

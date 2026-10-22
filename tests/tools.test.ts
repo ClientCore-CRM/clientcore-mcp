@@ -47,6 +47,33 @@ describe("набор инструментов по установке", () => {
     expect(textOf(r)).toContain("Токен недействителен или отозван.");
   });
 
+  it("401 у ключа cck_ на адресе ClientCore - подсказка про старый ключ Retail Rocket", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => json({ error: "Токен недействителен или отозван." }, 401)));
+    const c = await connect("cck_dead");
+    const body = JSON.parse(textOf(await c.callTool({ name: "calculator_status", arguments: {} })));
+    expect(body.message).toContain("Токен недействителен или отозван.");
+    expect(body.hint).toBe(
+      "если это ключ портала Retail Rocket — перевыпусти его (новые начинаются с rrk_) или задай CALCULATOR_BASE_URL=https://rrsales.clientcore.ru"
+    );
+  });
+
+  it.each([
+    ["ключ rrk_", "rrk_dead", {}],
+    ["свой адрес портала", "cck_dead", { CALCULATOR_BASE_URL: "https://rrsales.clientcore.ru" }],
+  ])("401 без подсказки: %s", async (_name, token, env) => {
+    vi.stubGlobal("fetch", vi.fn(async () => json({ error: "Токен недействителен или отозван." }, 401)));
+    const c = await connect(token, env);
+    const body = JSON.parse(textOf(await c.callTool({ name: "calculator_status", arguments: {} })));
+    expect(body).not.toHaveProperty("hint");
+  });
+
+  it("не 401 (портал упал) у cck_ - без подсказки", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => json({ error: "boom" }, 500)));
+    const c = await connect("cck_abc");
+    const body = JSON.parse(textOf(await c.callTool({ name: "calculator_status", arguments: {} })));
+    expect(body).not.toHaveProperty("hint");
+  });
+
   it("портал недоступен - calculator_status говорит «нет связи»", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("fetch failed"); }));
     const c = await connect("rrk_abc");
@@ -70,7 +97,9 @@ describe("набор инструментов по установке", () => {
     vi.stubGlobal("fetch", vi.fn(async () => json({ engine: "zzz" })));
     const c = await connect("cck_abc");
     expect(await names(c)).toEqual(["calculator_status"]);
-    expect(textOf(await c.callTool({ name: "calculator_status", arguments: {} }))).toContain("zzz");
+    const t = textOf(await c.callTool({ name: "calculator_status", arguments: {} }));
+    expect(t).toContain("zzz");
+    expect(t).toContain("calculator-mcp не поддерживает");
   });
 });
 
@@ -86,6 +115,36 @@ describe("вызовы РР", () => {
     const call = f.mock.calls.find((x) => String(x[0]).endsWith("/api/v1/kp/quote"))!;
     expect(JSON.parse((call as any)[1].body)).toEqual({ engineInput: input });
     expect(JSON.parse(textOf(r)).integration.months).toBe(2);
+  });
+
+  it("quote_kp передаёт discount и termMonths в /kp/quote как есть", async () => {
+    const f = vi.fn(async (url: string) =>
+      url.endsWith("/catalog") ? json({ engine: "rr-cdp" }) : json({ year: 900, termTotal: 450 })
+    );
+    vi.stubGlobal("fetch", f);
+    const c = await connect("rrk_abc");
+    const args = {
+      engineInput: { users: 1000 },
+      discount: { type: "percent", value: 10, untilDate: "2026-12-31" },
+      termMonths: 6,
+    };
+    const r = await c.callTool({ name: "quote_kp", arguments: args });
+    const call = f.mock.calls.find((x) => String(x[0]).endsWith("/api/v1/kp/quote"))!;
+    expect(JSON.parse((call as any)[1].body)).toEqual(args);
+    expect(JSON.parse(textOf(r)).termTotal).toBe(450);
+  });
+
+  it("quote_kp: схема скидки и срока та же, что у create_kp", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => json({ engine: "rr-cdp" })));
+    const c = await connect("rrk_abc");
+    const tools = (await c.listTools()).tools;
+    const q = tools.find((t) => t.name === "quote_kp")!.inputSchema as any;
+    const k = tools.find((t) => t.name === "create_kp")!.inputSchema as any;
+    expect(q.properties.discount).toEqual(k.properties.discount);
+    expect(q.properties.termMonths.type).toEqual(k.properties.termMonths.type);
+    expect(q.required).toEqual(["engineInput"]);
+    const bad = await c.callTool({ name: "quote_kp", arguments: { engineInput: {}, termMonths: 25 } });
+    expect(bad.isError).toBe(true);
   });
 
   it("create_kp шлёт engine rr-cdp в /kp", async () => {
