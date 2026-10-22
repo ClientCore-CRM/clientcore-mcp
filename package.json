@@ -1,9 +1,10 @@
 {
-  "name": "clientcore-mcp",
-  "version": "0.3.0",
-  "description": "MCP-сервер ClientCore — создание коммерческих предложений (КП) на offer.clientcore.ru из Claude / Cursor и других MCP-клиентов.",
+  "name": "calculator-mcp",
+  "version": "0.4.0",
+  "description": "MCP-сервер калькулятора КП: ClientCore (offer.clientcore.ru) и Retail Rocket (rrsales.clientcore.ru). Установка определяется ключом.",
   "type": "module",
   "bin": {
+    "calculator-mcp": "dist/index.js",
     "clientcore-mcp": "dist/index.js"
   },
   "files": [
@@ -12,7 +13,8 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/index.ts",
-    "prepare": "tsc"
+    "prepare": "tsc",
+    "test": "vitest run"
   },
   "engines": {
     "node": ">=18"
@@ -24,7 +26,8 @@
   "devDependencies": {
     "@types/node": "^22.19.19",
     "tsx": "^4.19.2",
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.9"
   },
   "license": "MIT"
 }
