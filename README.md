@@ -1,90 +1,112 @@
-# ClientCore MCP
+# calculator-mcp
 
-MCP-сервер для [offer.clientcore.ru](https://offer.clientcore.ru) — создавай коммерческие предложения (КП) прямо из Claude Desktop, Cursor, Claude Code и других MCP-клиентов.
+MCP-сервер калькулятора коммерческих предложений (КП) для Claude Desktop, Cursor, Claude Code и других MCP-клиентов. Раньше назывался `clientcore-mcp`.
 
-Умеет:
-- **Пакетные КП** — CRM Лайт (118к) / Старт (149к) / Рост (201к)
-- **Performance KPI** — режим поверх любого пакета: лимиты ×2 + премия 15% от прироста выручки CRM над бейзлайном (с минималкой — не меньше 80к/мес при приросте от 5%; `kpiNoMinBonus=true` — чистые 15% с первого рубля, в Loop уходит алерт). `kpiBaseline` — история канала по месяцам (`method: 2`, `history: [{ym, value}]`, 12–36 закрытых месяцев, лучше 24), выручка в **миллионах ₽**: рубли отклоняются с подсказкой правильного числа. Бейзлайн считает портал (с 10.2026 — уровень × сезонность × затухающий темп)
-- **Каналы внутри пакета** — `channels`: заменить email на SMS, push, мессенджеры и др., на Старте раздробить на любые каналы, на Росте — одну половину блока на 2 канала. Цена пакета не меняется, правила проверяет портал (422 с текстом). Не передан — у существующего КП того же пакета каналы сохраняются; `null` — вернуть каналы по каталогу
-- **Кастомные КП** — произвольный набор услуг через калькулятор
-- Разовые услуги (аудит, стратегия, мастер-шаблон, ПЛ, настройка Mindbox) и контракт 12 мес
-- **Скидка** — `discount` (процент или фиксированная сумма) вместе с обязательной `discountReason`: причина уходит алертом в Loop, скидка рендерится слоем поверх прайс-цены
-- **Срок пилота** — `termMonths` (1–24 месяца). Не задан = бессрочный регулярный проект
+**Установка определяется ключом.** Ключ из портала ClientCore подключает калькулятор ClientCore, ключ из портала Retail Rocket — калькулятор Retail Rocket. Подключений два, по одному на установку: КП двух компаний не смешиваются. При старте сервер спрашивает `GET /api/v1/catalog`, по полю `engine` выбирает набор инструментов и пишет в `instructions`, какой калькулятор подключён («Калькулятор КП ClientCore» / «Калькулятор КП Retail Rocket»).
 
-На выходе — публичная ссылка на КП-лендинг + ссылка на PDF.
+## 1. Получи ключ
 
-## 1. Получи токен
+Настройки своего портала → ключи (показывается один раз):
 
-Зайди на **offer.clientcore.ru → Настройки** (под своим `@clientcore.ru` аккаунтом), создай API-токен и скопируй его (показывается один раз).
+| Установка | Портал | Префикс ключа |
+|---|---|---|
+| ClientCore | https://offer.clientcore.ru | `cck_` |
+| Retail Rocket | https://rrsales.clientcore.ru | `rrk_` |
 
-## 2. Подключи MCP
+Адрес API выбирается по префиксу. Старый ключ Retail Rocket с префиксом `cck_` пойдёт не на тот портал: перевыпусти его (получишь `rrk_`) или задай `CALCULATOR_BASE_URL`.
 
-### Claude Desktop
+## 2. Подключи
 
-`~/Library/Application Support/Claude/claude_desktop_config.json` (macOS):
+### Claude Code
+
+ClientCore:
+
+```bash
+claude mcp add calculator-cc \
+  --env CALCULATOR_API_TOKEN=cck_ваш_ключ \
+  -- npx -y github:ClientCore-CRM/calculator-mcp
+```
+
+Retail Rocket:
+
+```bash
+claude mcp add calculator-rr \
+  --env CALCULATOR_API_TOKEN=rrk_ваш_ключ \
+  -- npx -y github:ClientCore-CRM/calculator-mcp
+```
+
+### Claude Desktop / Cursor
+
+`~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) или `~/.cursor/mcp.json`:
 
 ```json
 {
   "mcpServers": {
-    "clientcore": {
+    "calculator-rr": {
       "command": "npx",
-      "args": ["-y", "github:ClientCore-CRM/clientcore-mcp"],
-      "env": {
-        "CLIENTCORE_API_TOKEN": "cck_ваш_токен"
-      }
+      "args": ["-y", "github:ClientCore-CRM/calculator-mcp"],
+      "env": { "CALCULATOR_API_TOKEN": "rrk_ваш_ключ" }
     }
   }
 }
 ```
 
-### Claude Code
-
-```bash
-claude mcp add clientcore \
-  --env CLIENTCORE_API_TOKEN=cck_ваш_токен \
-  -- npx -y github:ClientCore-CRM/clientcore-mcp
-```
-
-### Cursor
-
-`~/.cursor/mcp.json` — тот же формат, что и Claude Desktop.
-
 Перезапусти клиент после изменения конфига.
 
-## 3. Пользуйся
-
-Примеры запросов агенту:
-
-- «Сделай КП для Tripster на пакет Рост с Performance KPI»
-- «Собери кастомное КП: менеджмент, email-автоматизация 20ч, 8 рассылок, аудит разово»
-- «КП на Старт с контрактом 12 месяцев и мастер-шаблоном на 14 блоков»
-
 ## Инструменты
+
+### ClientCore (`cc-services`)
 
 | Tool | Что делает |
 |---|---|
 | `get_catalog` | Пакеты, услуги (ключи для кастома), addons, типы оплаты |
-| `create_package_kp` | КП на пакете (+ опц. `channels`, `kpiMode`, `kpiBaseline`, `addOns`, `contract12Months`) |
+| `create_package_kp` | КП на пакете (+ опц. `channels`, `kpiMode`, `kpiBaseline`, `addOns`, `contract12Months`, `discount`, `termMonths`) |
 | `create_custom_kp` | Кастомное КП по `selections` калькулятора |
 | `set_kp_logo` | Сменить логотип существующего КП по `slug` |
 | `create_share_link` | Ссылка для клиента (с токеном — открытия логируются) |
+
+Имена и параметры не менялись с `clientcore-mcp` 0.3.0: скиллы с `mcp__clientcore__create_package_kp` и т. п. работают без правок. Сделка — Bitrix24 (`bitrixDealId`).
+
+### Retail Rocket (`rr-cdp`)
+
+| Tool | Что делает |
+|---|---|
+| `kp_catalog` | Каталог движка цены установки: вкладки, ступени, модули, оплата |
+| `quote_kp` | Расчёт без сохранения: услуги, итоги, НДС, интеграционный период `integration` и год с ним `year` — те же числа, что покажет КП |
+| `create_kp` | Создать (или перезаписать) КП для сделки amoCRM (`dealId`); `forceNew=true` — ещё одно КП по той же сделке |
+| `set_kp_logo` | Сменить логотип существующего КП по `slug` |
+| `create_share_link` | Ссылка для клиента |
+
+Интеграционный период — поле `integration` в `engineInput`: `{ months: 1-3, discountPct: 5-100 кратно 5 }`.
+
+### Ключ не работает
+
+Ключ отозван или портал недоступен — сервер поднимается с одним инструментом `calculator_status`, который возвращает текст ошибки портала («Токен недействителен или отозван.», «нет связи с …»).
 
 ## Переменные окружения
 
 | Переменная | По умолчанию | |
 |---|---|---|
-| `CLIENTCORE_API_TOKEN` | — | **обязательно** |
-| `CLIENTCORE_BASE_URL` | `https://offer.clientcore.ru` | для локальной разработки |
+| `CALCULATOR_API_TOKEN` | — | **обязательно**; если нет, читается прежняя `CLIENTCORE_API_TOKEN` |
+| `CALCULATOR_BASE_URL` | по префиксу ключа | адрес портала: стенд, локальная разработка, старый ключ РР с `cck_` |
+
+## Совместимость
+
+- Репозиторий переименован из `ClientCore-CRM/clientcore-mcp`; GitHub редиректит старое имя, поэтому `npx -y github:ClientCore-CRM/clientcore-mcp` у уже подключённых продолжает работать.
+- Пакет отдаёт два bin: `calculator-mcp` и `clientcore-mcp`.
+- `CLIENTCORE_API_TOKEN` читается, если `CALCULATOR_API_TOKEN` не задана. Прежняя `CLIENTCORE_BASE_URL` тоже читается, если `CALCULATOR_BASE_URL` не задана.
+- Имена и параметры инструментов ClientCore не изменились.
 
 ## Локальная разработка
 
 ```bash
 npm install
+npm test
 npm run build
-CLIENTCORE_API_TOKEN=cck_... CLIENTCORE_BASE_URL=http://localhost:3000 npm run dev
+CALCULATOR_API_TOKEN=rrk_... CALCULATOR_BASE_URL=http://localhost:3000 npm run dev
 ```
 
 ## Безопасность
 
-- Токен даёт право создавать КП от твоего имени. Не коммить его и не передавай.
-- Скомпрометирован — отзови в **Настройках** и создай новый.
+- Ключ даёт право создавать КП от твоего имени. Не коммить его и не передавай.
+- Скомпрометирован — отзови в Настройках портала и создай новый.
