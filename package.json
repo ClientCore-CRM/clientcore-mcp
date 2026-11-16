@@ -1,6 +1,6 @@
 {
   "name": "calculator-mcp",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "MCP-сервер калькулятора КП: ClientCore (offer.clientcore.ru) и Retail Rocket (rrsales.clientcore.ru). Установка определяется ключом.",
   "type": "module",
   "bin": {
