@@ -221,16 +221,23 @@ export function registerCcTools(server: McpServer, api: Api): void {
         .describe("ОБЯЗАТЕЛЬНО: числовой id сделки Bitrix24 (КП всегда привязывается к сделке; заполнит её поля + ссылку КП)"),
       clientSite: z.string().optional(),
       clientLogo: z.string().optional(),
+      tasks: z.array(z.string()).max(8).optional().describe("Задачи и согласованные условия клиента, видимые в КП"),
       selections: z
         .record(
           z.object({
             status: z.enum(["included", "excluded", "on_request"]),
             hours: z.number().optional(),
             qty: z.number().optional(),
+            priceOverride: z.number().int().min(0).optional().describe("Ручная цена фиксированной услуги, ₽ до наценки. 0 = бесплатно. Требует priceNote"),
+            priceNote: z.string().optional().describe("Обязательная причина ручной цены. Только для команды, в КП клиенту не показывается; уходит уведомление"),
+          }).superRefine((selection, ctx) => {
+            if (selection.status === "included" && selection.priceOverride !== undefined && !selection.priceNote?.trim()) {
+              ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["priceNote"], message: "Укажи причину ручной цены" });
+            }
           })
         )
         .describe(
-          "Карта услуг: { selectionKey: { status, hours?, qty? } }. Ключи из get_catalog.\n" +
+          "Карта услуг: { selectionKey: { status, hours?, qty?, priceOverride?, priceNote? } }. Ручная цена, включая 0, требует причины и вызывает уведомление в Loop. Ключи из get_catalog.\n" +
             "Два правила состава применяются на сервере, спорить с ними бесполезно:\n" +
             "1) strategy_audit и strategy_automation_strategy не совмещаются — аудит входит в стратегию целиком, пришлёшь обе, аудит снимется;\n" +
             "2) management_base («Сопровождение проекта») проставляется сам, как только в КП есть хоть одна услуга кроме аудита и стратегии, и наоборот — снимается вместе с management_monthly_analysis, если в КП только аудит и/или стратегия. Разовую консультацию не сопровождают, и менеджмент за 30-60к в такое КП попасть не должен."
@@ -280,7 +287,11 @@ export function registerCcTools(server: McpServer, api: Api): void {
         .describe("Причина скидки — обязательна при discount. Уходит алертом в Loop вместе со ссылкой на КП"),
     },
     async (args) => {
-      const r = await api("POST", "/api/v1/kp/custom", args);
+      // Старый портал удалял неизвестные поля цены. Новый адрес на старой
+      // версии даст 404 без записи вместо молчаливого создания дорогого КП.
+      const manual = Object.values(args.selections).some((selection) => selection.priceOverride !== undefined);
+      const r = await api("POST", manual ? "/api/v1/kp/custom/manual-price" : "/api/v1/kp/custom", args);
+      if (manual && r.status === 404) return asText({ error: true, status: 404, details: "Портал ещё не поддерживает ручные цены. Сначала обнови портал." });
       if (!r.ok) return asText({ error: true, status: r.status, details: r.data });
       return asText(r.data);
     }

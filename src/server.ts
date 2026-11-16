@@ -9,7 +9,7 @@ import { registerRrTools } from "./tools-rr.js";
 export const PROBE_TIMEOUT_MS = 10_000;
 
 export const SERVER_NAME = "calculator-mcp";
-export const SERVER_VERSION = "0.4.0";
+export const SERVER_VERSION = "0.4.1";
 
 type CatalogProbe = { engine: string | null; error: string | null; status: number | null };
 

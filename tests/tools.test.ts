@@ -196,3 +196,34 @@ describe("вызовы ClientCore", () => {
     expect(textOf(r)).toContain("млн ₽");
   });
 });
+
+// Реальный MCP transport обязан сохранить ручную цену, а не потерять её при Zod-разборе.
+it("ручная цена и причина проходят из MCP в API, без причины запись запрещена", async () => {
+  const f = vi.fn(async (_url: unknown, init?: RequestInit) => json(init?.method === "POST" ? { url: "https://offer.clientcore.ru/kp/test" } : { engine: "cc-services" }));
+  vi.stubGlobal("fetch", f);
+  const c = await connect("cck_test");
+  const args = { clientName: "2MOOD", bitrixDealId: "4015", selections: {
+    strategy_automation_strategy: { status: "included", priceOverride: 0, priceNote: "Подарок за годовой контракт" },
+  } };
+  await c.callTool({ name: "create_custom_kp", arguments: args });
+  const post = f.mock.calls.find((call) => call[1]?.method === "POST");
+  expect(post?.[0]).toBe("https://offer.clientcore.ru/api/v1/kp/custom/manual-price");
+  expect(JSON.parse(String(post?.[1]?.body)).selections.strategy_automation_strategy).toEqual(args.selections.strategy_automation_strategy);
+  const before = f.mock.calls.length;
+  const bad = await c.callTool({ name: "create_custom_kp", arguments: { ...args, selections: {
+    strategy_automation_strategy: { status: "included", priceOverride: 0 },
+  } } });
+  expect(bad.isError).toBe(true);
+  expect(f.mock.calls).toHaveLength(before);
+});
+
+it("старый портал отклоняет ручную цену без fallback на старый пишущий endpoint", async () => {
+  const f = vi.fn(async (_url: unknown, init?: RequestInit) => init?.method === "POST" ? json({ error: "Not found" }, 404) : json({ engine: "cc-services" }));
+  vi.stubGlobal("fetch", f);
+  const c = await connect("cck_test");
+  const result = await c.callTool({ name: "create_custom_kp", arguments: {
+    clientName: "2MOOD", bitrixDealId: "4015", selections: { strategy_automation_strategy: { status: "included", priceOverride: 0, priceNote: "Подарок" } },
+  } });
+  expect(JSON.parse(textOf(result))).toMatchObject({ error: true, status: 404 });
+  expect(f.mock.calls.filter((call) => call[1]?.method === "POST").map((call) => call[0])).toEqual(["https://offer.clientcore.ru/api/v1/kp/custom/manual-price"]);
+});
